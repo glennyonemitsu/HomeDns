@@ -22,24 +22,27 @@ const (
 )
 
 func router(res http.ResponseWriter, req *http.Request) {
-	fmt.Println(req.URL)
 	id, property, err := endpoint(req.URL)
-	if record, findErr := db.findById(id); err != nil || findErr != nil || record == nil {
-		res.WriteHeader(404)
-		fmt.Fprint(res, err)
-	} else {
-		switch property {
-		case "ipv4":
-			fmt.Fprint(res, record.ipv4)
-		case "ipv6":
-			fmt.Fprint(res, record.ipv6)
-		case "id":
-			fmt.Fprint(res, record.id)
-		case "ttl":
-			fmt.Fprint(res, record.timeToLive)
-		default:
+	switch req.Method {
+	case "GET":
+		if record, found := db.findById(id); err != nil || found == false {
 			res.WriteHeader(404)
+		} else {
+			switch property {
+			case "ipv4":
+				fmt.Fprint(res, record.ipv4)
+			case "ipv6":
+				fmt.Fprint(res, record.ipv6)
+			case "id":
+				fmt.Fprint(res, record.id)
+			case "ttl":
+				fmt.Fprint(res, record.timeToLive)
+			default:
+				res.WriteHeader(404)
+			}
 		}
+	case "PUT":
+		res.WriteHeader(404)
 	}
 }
 
