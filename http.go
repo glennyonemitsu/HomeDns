@@ -37,6 +37,8 @@ func router(res http.ResponseWriter, req *http.Request) {
 				fmt.Fprint(res, record.id)
 			case "ttl":
 				fmt.Fprint(res, record.timeToLive)
+			case "":
+				fmt.Fprintln(res, record.outputText())
 			default:
 				res.WriteHeader(404)
 			}
