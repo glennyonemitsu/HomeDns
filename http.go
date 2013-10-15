@@ -12,6 +12,14 @@ import (
 	"errors"
 )
 
+/**
+ These are parts of the URL split by "/"
+ */
+const (
+	_ = iota // 0 is skipped since split always has first item empty
+	apiRecordId
+	apiRecordProperty
+)
 
 func router(res http.ResponseWriter, req *http.Request) {
 	fmt.Println(req.URL)
@@ -44,10 +52,10 @@ func endpoint(url *url.URL) (id string, property string, err error) {
 	if l := len(parts); l == 2 {
 		err = errors.New("Invalid URL")
 	} else if l == 3 {
-		id = parts[1]
+		id = parts[apiRecordId]
 	} else if l == 4 {
-		id = parts[1]
-		property = parts[2]
+		id = parts[apiRecordId]
+		property = parts[apiRecordProperty]
 	}
 	return id, property, err
 
