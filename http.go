@@ -6,9 +6,11 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"strconv"
 	"errors"
 )
 
@@ -22,10 +24,11 @@ const (
 )
 
 func router(res http.ResponseWriter, req *http.Request) {
-	id, property, err := endpoint(req.URL)
+	id, property, badURL := endpoint(req.URL)
+	record, found := db.findById(id)
 	switch req.Method {
 	case "GET":
-		if record, found := db.findById(id); err != nil || found == false {
+		if badURL != nil || found == false {
 			res.WriteHeader(404)
 		} else {
 			switch property {
@@ -44,7 +47,34 @@ func router(res http.ResponseWriter, req *http.Request) {
 			}
 		}
 	case "PUT":
-		res.WriteHeader(404)
+		var ipv4ip, ipv6ip net.IP
+
+		password := req.PostFormValue("password")
+		ipv4 := req.PostFormValue("ipv4")
+		ipv6 := req.PostFormValue("ipv6")
+		ttl, _ := strconv.ParseInt(req.PostFormValue("ttl"), 10, 32)
+		timeToLive := int32(ttl)
+		if timeToLive > 3600 {
+			timeToLive = 3600
+		}
+		clientIp := getClientIP(req.RemoteAddr)
+
+		ipv4ip = net.ParseIP(ipv4)
+		if ipv4ip == nil && isIpv4(clientIp) {
+			ipv4ip = net.ParseIP(clientIp)
+		}
+
+		ipv6ip = net.ParseIP(ipv6)
+		if ipv6ip == nil && isIpv6(clientIp) {
+			ipv6ip = net.ParseIP(clientIp)
+		}
+
+		if found {
+		} else {
+			db.setRecord(id, ipv4ip, ipv6ip, timeToLive, password)
+		}
+		fmt.Fprint(res, req.Header)
+		fmt.Fprint(res, req.RemoteAddr)
 	}
 }
 
@@ -64,4 +94,30 @@ func endpoint(url *url.URL) (id string, property string, err error) {
 	}
 	return id, property, err
 
+}
+
+func getClientIP(addr string) (ip string) {
+	splitIndex := strings.LastIndex(addr, ":")
+	if splitIndex == -1 {
+		ip = addr
+	} else {
+		ip = addr[:splitIndex]
+	}
+	return
+}
+
+func isIpv4(ip string) bool {
+	if strings.Count(ip, ".") > 0 {
+		return true
+	} else {
+		return false
+	}
+}
+
+func isIpv6(ip string) bool {
+	if strings.Count(ip, ":") > 0 {
+		return true
+	} else {
+		return false
+	}
 }

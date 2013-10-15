@@ -17,7 +17,7 @@ func main() {
 }
 
 func init() {
-	db = database{records: make(map[string]record)}
-	db.records["glenn"] = record{id: "glenn", ipv4: net.ParseIP("127.0.0.1"), timeToLive: 3600, password: "password"}
-	db.records["platters"] = record{id: "platters", ipv4: net.ParseIP("192.168.1.124"), timeToLive: 3600, password: "password"}
+	db = database{records: make(map[string]*record)}
+	db.setRecord("glenn", net.ParseIP("127.0.0.1"), net.ParseIP(""), 3600, "password")
+	db.setRecord("platters", net.ParseIP("192.168.1.124"), net.ParseIP(""), 3600, "password")
 }
