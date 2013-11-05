@@ -9,8 +9,17 @@ import (
 )
 
 var db map[string]*record
+
+// server mode flags
 var flagBind *string
 var flagPassword *string
+
+// client mode flags
+var flagServer *string
+var flagHostname *string
+var flagIpv4 *string
+var flagTtl *string
+
 var homeDNSPrefix string
 var homeDNSPrefixLength int
 
@@ -23,8 +32,12 @@ type record struct {
 func init() {
 	db = make(map[string]*record)
 
-	flagBind = flag.String("bind", "0.0.0.0:53", "IP:PORT to bind to")
+	flagBind = flag.String("bind", "", "IP:PORT to bind to")
 	flagPassword = flag.String("password", "", "password to be used for authentication")
+	flagServer = flag.String("server", "", "server address to send updated record to")
+	flagHostname = flag.String("hostname", "", "A record to update")
+	flagIpv4 = flag.String("ipv4", "", "IP address of the record. Leave alone to use IP of the client")
+	flagTtl = flag.String("ttl", "3600", "TTL setting for the DNS record")
 	flag.Parse()
 
 	homeDNSPrefix = "HOMEDNS;" + *flagPassword + ";"
@@ -33,27 +46,52 @@ func init() {
 }
 
 func main() {
-	ip, port := ipPort(*flagBind)
-	netIP := net.ParseIP(ip)
-	addr := net.UDPAddr{IP: netIP, Port: port, Zone: ""}
-	conn, err := net.ListenUDP("udp", &addr)
-	if err != nil {
-		fmt.Println(err)
-	}
-	for {
-		handleUDPConnection(conn)
+	if *flagBind != "" {
+		ip, port := ipPort(*flagBind)
+		netIP := net.ParseIP(ip)
+		addr := net.UDPAddr{IP: netIP, Port: port, Zone: ""}
+		conn, err := net.ListenUDP("udp", &addr)
+		if err != nil {
+			fmt.Println(err)
+		}
+		for {
+			handleUDPConnection(conn)
+		}
+	} else if *flagServer != "" {
+		var msg string
+		if *flagIpv4 != "" {
+			msg = fmt.Sprintf("%s%s;%s;%s;", homeDNSPrefix, *flagHostname, *flagTtl, *flagIpv4)
+		} else {
+			msg = fmt.Sprintf("%s%s;%s;", homeDNSPrefix, *flagHostname, *flagTtl)
+		}
+		ip, port := ipPort(*flagServer)
+		netIP := net.ParseIP(ip)
+		addr := net.UDPAddr{IP: netIP, Port: port, Zone: ""}
+		conn, err := net.DialUDP("udp", nil, &addr)
+		defer conn.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+		conn.Write([]byte(msg))
 	}
 }
 
-func ipPort(address string) (ip string, port int) {
+func ipPort(address string) (string, int) {
 	parts := strings.Split(address, ":")
-	ip = parts[0]
-	port64, _ := strconv.ParseInt(parts[1], 10, 0)
-	port = int(port64)
-
+	ip := parts[0]
+	var port int
+	if len(parts) == 2 {
+		port64, _ := strconv.ParseInt(parts[1], 10, 0)
+		port = int(port64)
+	} else {
+		port = 53
+	}
 	return ip, port
 }
 
+/**
+ *
+ */
 func handleUDPConnection(conn *net.UDPConn) {
 	input := make([]byte, 1024)
 	size, source, err := conn.ReadFromUDP(input[0:])
@@ -76,7 +114,9 @@ func handleUDPConnection(conn *net.UDPConn) {
 				rec.ipv4 = source.IP
 			}
 			db[messageParts[0]] = rec
+			fmt.Println("Storing", rec)
 		} else {
+			fmt.Printf("%x", input[0:size])
 		}
 	}
 }
