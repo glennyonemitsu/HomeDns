@@ -6,14 +6,31 @@ HomeDns is a very simple dynamic DNS service.
 
 ### Starting the server
 
-Start the server with a password specified.
+The command runs as a server when the `-bind` and `-password` command flags are
+specified
 
-    HomeDns -password=somesecret
+    HomeDns \
+		-bind=0.0.0.0:53 \
+		-password=somesecret
 
-## Updating a DNS record
+### Updating the server's record with the HomeDns command
 
-Add a dynamic DNS entry to the server by sending a specially formatted UDP 
-packet on port 53. It must follow the format:
+The command runs as a client with the `-server` command flag
+
+	HomeDns \
+		-password=somesecret \
+		-server=mypersonaldyndns.example.com \
+		-ttl=600 \
+		-ipv4=1.2.3.4 \
+		-name=myhome
+
+This might seem odd, using the `-server` flag to indicate client mode, but that
+indicates the server address, while the `-bind` is more common nomenclature for
+a server parameter.
+
+#### The UDP packet format to update
+
+The UDP packet to update a DNS record follows this format:
 
     HOMEDNS;<your password>;<hostname>;<ttl>;<ip (optional)>;
 
@@ -24,8 +41,3 @@ netcat utility to send a UDP packet via shell.
 
 An A record query will return the proper DNS response (not implemented yet).
 
-### Updating the server's record with the HomeDns command
-
-Example of client mode
-
-	HomeDns -password=somesecret -server=mypersonaldyndns.example.com -ttl=600 -ipv4=1.2.3.4 -name=myhome
