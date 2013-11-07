@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"flag"
 	"net"
@@ -46,6 +47,7 @@ func init() {
 }
 
 func main() {
+	// server mode
 	if *flagBind != "" {
 		ip, port := ipPort(*flagBind)
 		netIP := net.ParseIP(ip)
@@ -57,6 +59,7 @@ func main() {
 		for {
 			handleUDPConnection(conn)
 		}
+	// client mode
 	} else if *flagServer != "" {
 		var msg string
 		if *flagIpv4 != "" {
@@ -89,17 +92,17 @@ func ipPort(address string) (string, int) {
 	return ip, port
 }
 
-/**
- *
- */
 func handleUDPConnection(conn *net.UDPConn) {
 	input := make([]byte, 1024)
 	size, source, err := conn.ReadFromUDP(input[0:])
+	packet := input[0:size]
+
 	if err != nil {
 		fmt.Println(err)
 	} else {
-		if string(input[0:homeDNSPrefixLength]) == homeDNSPrefix {
-			message := string(input[homeDNSPrefixLength:size])
+		// update packet from HomeDns client
+		if string(packet[0:homeDNSPrefixLength]) == homeDNSPrefix {
+			message := string(packet[homeDNSPrefixLength:size])
 			messageParts := strings.Split(message, ";")
 			rec := new(record)
 			rec.name = messageParts[0]
@@ -115,8 +118,37 @@ func handleUDPConnection(conn *net.UDPConn) {
 			}
 			db[messageParts[0]] = rec
 			fmt.Println("Storing", rec)
-		} else {
-			fmt.Printf("%x", input[0:size])
+		// DNS query packet
+		} else if isQueryPacket(packet) {
+			query := parseQueryPacket(packet)
+			fmt.Println("query", query)
+			if record, has := db[query.subdomain]; has == true {
+				fmt.Println(record)
+			} else {
+				fmt.Printf("record for '%s' not found\n", query.subdomain)
+				fmt.Println(db)
+			}
 		}
 	}
+}
+
+type query struct {
+	qid int16
+	subdomain string
+}
+
+func isQueryPacket(packet []byte) bool {
+	flag := "\x01\x00"
+	tail := "\x00\x00\x01\x00\x01"
+	return string(packet[2:4]) == flag && string(packet[len(packet)-len(tail):]) == tail
+}
+
+func parseQueryPacket(packet []byte) *query {
+	q := new(query)
+	flagInt, _ := binary.Uvarint(packet[0:2])
+	q.qid = int16(flagInt)
+	hostname := packet[12:len(packet) - 5]
+	subdomainLength := int(hostname[0])
+	q.subdomain = string(hostname[1:subdomainLength + 1])
+	return q
 }
